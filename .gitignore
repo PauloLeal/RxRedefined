@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+.env
+.DS_Store
+# The test brief itself is not part of the submission
+*.pdf

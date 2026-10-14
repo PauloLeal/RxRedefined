@@ -1,0 +1,158 @@
+# Sample requests for the Kitchen Display Queue API.
+# Use with the VS Code "REST Client" extension (humao.rest-client): click "Send Request" above each one.
+#
+# Tip: run "Create an order" first. The transition requests below use its id
+# ({{createOrder.response.body.order.id}}), so you can walk one order through its whole life.
+
+@baseUrl = http://localhost:4000
+
+###############################################################################
+# Queue
+###############################################################################
+
+### Active queue (received + preparing), sorted by score
+GET {{baseUrl}}/orders/queue
+
+### Only received orders
+GET {{baseUrl}}/orders/queue?status=received
+
+### Only preparing orders
+GET {{baseUrl}}/orders/queue?status=preparing
+
+### Invalid filter -> 400 INVALID_STATUS_FILTER
+GET {{baseUrl}}/orders/queue?status=ready
+
+###############################################################################
+# Menu
+###############################################################################
+
+### Menu items (ids to use in POST /orders)
+GET {{baseUrl}}/menu-items
+
+###############################################################################
+# Create orders
+###############################################################################
+
+### Create an order (VIP delivery promised in the future)
+# @name createOrder
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer_name": "REST Client",
+  "type": "delivery",
+  "is_vip": true,
+  "promised_at": "{{$datetime iso8601 20 m}}",
+  "items": [
+    { "menu_item_id": 1, "quantity": 2 },
+    { "menu_item_id": 4, "quantity": 1 }
+  ]
+}
+
+### Create a minimal order (dine-in, no promise, not VIP)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer_name": "Walk-in",
+  "type": "dine_in",
+  "items": [{ "menu_item_id": 2, "quantity": 1 }]
+}
+
+### Validation error: empty items -> 400 VALIDATION_ERROR
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer_name": "Nobody",
+  "type": "takeout",
+  "items": []
+}
+
+### Validation error: several problems at once -> 400 VALIDATION_ERROR
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer_name": "",
+  "type": "drive_thru",
+  "promised_at": "tomorrow",
+  "items": [{ "menu_item_id": 1, "quantity": 0 }]
+}
+
+### Validation error: menu item does not exist -> 400 VALIDATION_ERROR
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer_name": "Ghost",
+  "type": "takeout",
+  "items": [{ "menu_item_id": 999, "quantity": 1 }]
+}
+
+### Malformed JSON -> 400 INVALID_JSON
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{ "customer_name": "oops",
+
+###############################################################################
+# Status transitions (uses the order created by "createOrder" above)
+###############################################################################
+
+@orderId = {{createOrder.response.body.order.id}}
+
+### received -> preparing
+POST {{baseUrl}}/orders/{{orderId}}/start
+
+### Start again -> 409 INVALID_TRANSITION (repeating a step is an error)
+POST {{baseUrl}}/orders/{{orderId}}/start
+
+### Cancel while preparing -> 409 INVALID_TRANSITION (only received orders can be cancelled)
+POST {{baseUrl}}/orders/{{orderId}}/cancel
+
+### preparing -> ready
+POST {{baseUrl}}/orders/{{orderId}}/ready
+
+### ready -> picked_up
+POST {{baseUrl}}/orders/{{orderId}}/pickup
+
+### Anything after picked_up -> 409 INVALID_TRANSITION (terminal status)
+POST {{baseUrl}}/orders/{{orderId}}/start
+
+###############################################################################
+# Cancel flow (creates its own order)
+###############################################################################
+
+### Create an order to cancel
+# @name orderToCancel
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customer_name": "Changed my mind",
+  "type": "takeout",
+  "items": [{ "menu_item_id": 3, "quantity": 1 }]
+}
+
+### Skip a step while still received: received -> ready -> 409 INVALID_TRANSITION
+POST {{baseUrl}}/orders/{{orderToCancel.response.body.order.id}}/ready
+
+### received -> cancelled
+POST {{baseUrl}}/orders/{{orderToCancel.response.body.order.id}}/cancel
+
+### Cancel again -> 409 INVALID_TRANSITION (cancelled is terminal)
+POST {{baseUrl}}/orders/{{orderToCancel.response.body.order.id}}/cancel
+
+###############################################################################
+# Not found
+###############################################################################
+
+### Unknown order -> 404 ORDER_NOT_FOUND
+POST {{baseUrl}}/orders/999999/start
+
+### Non-numeric id -> 404 ORDER_NOT_FOUND
+POST {{baseUrl}}/orders/abc/start
+
+### Unknown route -> 404 ROUTE_NOT_FOUND
+GET {{baseUrl}}/nope

@@ -1,0 +1,17 @@
+{
+  "name": "kitchen-display-queue",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "npm install --prefix api && npm install --prefix web",
+    "db:setup": "npm run db:setup --prefix api",
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev --prefix api\" \"npm run dev --prefix web\"",
+    "test": "npm test --prefix api && npm test --prefix web",
+    "test:e2e": "npm run test:e2e --prefix web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
