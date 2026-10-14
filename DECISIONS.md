@@ -2,8 +2,8 @@
 
 ## 1. Scope
 
-**Time spent:** about 1h10 of the 4-hour box, from 09:27 to about 10:40 BRT on 2026-10-14. That
-covers everything, extras included. The timestamps are in `ai-logs/`.
+**Time spent:** about 1h25 of the 4-hour box, from 09:27 to about 10:50 BRT on 2026-10-14. That
+covers everything, extras and docs included. The timestamps are in `ai-logs/`.
 
 I built everything the brief requires: the data model with migrations and a relative-date seed,
 the priority queue, the state machine, the five endpoints, the Kitchen Display page, and the
@@ -141,11 +141,19 @@ fields and checks the live API order. It matched in all three views.
 
 ## 6. Next
 
-1. **Status history with timestamps and the person who made each change.** Add an
-   `order_status_events` table written in the same transaction as the status change. A real
-   kitchen needs to answer "why was this order late?" and "who cancelled it?". It also unlocks
-   ranking by time spent in `preparing`, a likely next product request.
-2. **Push updates to every screen.** Several screens (expeditor, line cooks, pass) must agree
+1. **Authentication that identifies the operator, in the UI and in the API.** Today anyone who
+   can reach the API can start, cancel or create any order, and nothing records who did it. Each
+   operator would sign in on the Kitchen Display (a short per-operator PIN suits a shared kitchen
+   tablet better than a full login form). The API would require a valid token on every request,
+   reject anything else with `401 UNAUTHENTICATED`, and pass the operator's identity to the
+   modules. Hiding buttons is not enough here, for the same reason as the state machine: the API
+   must enforce it.
+2. **Status history with timestamps and the operator who made each change.** Add an
+   `order_status_events` table written in the same transaction as the status change, recording
+   the operator from item 1. A real kitchen needs to answer "why was this order late?" and "who
+   cancelled it?". It also unlocks ranking by time spent in `preparing`, a likely next product
+   request.
+3. **Push updates to every screen.** Several screens (expeditor, line cooks, pass) must agree
    instantly. Today each screen polls every 5 seconds: that costs one query per screen every 5
    seconds even when nothing changed, and a screen can still be up to 5 seconds stale. I would
    push changes to the screens (Server-Sent Events) and keep the conditional update as the
